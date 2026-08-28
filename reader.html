@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>阅读</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", serif; background: #fdf6e3; min-height: 100vh; }
+    .topbar { background: #1a1a2e; color: #fff; padding: 12px 16px; display: flex; align-items: center; position: sticky; top: 0; gap: 12px; }
+    .back-link { color: #fff; text-decoration: none; font-size: 1.2rem; }
+    .topbar-title { font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .download-btn { color: #fff; background: #2d6a4f; text-decoration: none; font-size: 0.85rem; padding: 6px 14px; border-radius: 20px; }
+    .content { max-width: 700px; margin: 0 auto; padding: 24px 20px; font-size: 1.1rem; line-height: 2; color: #2c2c2c; white-space: pre-wrap; word-wrap: break-word; }
+    .loading { text-align: center; padding: 40px; color: #666; }
+    .error { text-align: center; padding: 40px; color: #e74c3c; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a href="/charlies-cave/" class="back-link">←</a>
+    <span class="topbar-title" id="title">加载中...</span>
+    <a id="downloadBtn" class="download-btn" style="display:none;">下载</a>
+  </div>
+  <div class="content" id="content">
+    <div class="loading">加载中...</div>
+  </div>
+  <script>
+    const USERNAME = 'HopeuLive';
+    const REPO = 'charlies-cave';
+    async function loadFile() {
+      const params = new URLSearchParams(window.location.search);
+      const filePath = params.get('path');
+      if (!filePath) { document.getElementById('content').innerHTML = '<div class="error">缺少文件路径</div>'; return; }
+      try {
+        const response = await fetch('https://api.github.com/repos/' + USERNAME + '/' + REPO + '/contents/' + filePath);
+        if (!response.ok) throw new Error('Failed');
+        const data = await response.json();
+        const content = decodeURIComponent(escape(atob(data.content)));
+        const fileName = data.name.replace(/\.txt$/i, '');
+        document.title = fileName;
+        document.getElementById('title').textContent = fileName;
+        document.getElementById('content').textContent = content;
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const btn = document.getElementById('downloadBtn');
+        btn.href = url;
+        btn.download = fileName + '.txt';
+        btn.style.display = 'inline-block';
+      } catch (error) {
+        document.getElementById('content').innerHTML = '<div class="error">加载失败，请返回重试</div>';
+      }
+    }
+    loadFile();
+  </script>
+</body>
+</html>
