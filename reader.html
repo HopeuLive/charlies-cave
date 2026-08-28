@@ -7,13 +7,33 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", serif; background: #fdf6e3; min-height: 100vh; }
-    .topbar { background: #1a1a2e; color: #fff; padding: 12px 16px; display: flex; align-items: center; position: sticky; top: 0; gap: 12px; }
-    .back-link { color: #fff; text-decoration: none; font-size: 1.2rem; }
-    .topbar-title { font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-    .download-btn { color: #fff; background: #2d6a4f; text-decoration: none; font-size: 0.85rem; padding: 6px 14px; border-radius: 20px; }
+    .topbar { background: #1a1a2e; color: #fff; padding: 12px 16px; display: flex; align-items: center; position: sticky; top: 0; z-index: 10; gap: 12px; }
+    .back-link { color: #fff; text-decoration: none; font-size: 1.2rem; flex-shrink: 0; }
+    .topbar-title { font-size: 1rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+    .download-btn { color: #fff; background: #2d6a4f; text-decoration: none; font-size: 0.85rem; padding: 6px 14px; border-radius: 20px; flex-shrink: 0; }
     .content { max-width: 700px; margin: 0 auto; padding: 24px 20px; font-size: 1.1rem; line-height: 2; color: #2c2c2c; white-space: pre-wrap; word-wrap: break-word; }
     .loading { text-align: center; padding: 40px; color: #666; }
     .error { text-align: center; padding: 40px; color: #e74c3c; }
+    .bookmark-bar {
+      max-width: 700px;
+      margin: 16px auto 0;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.85rem;
+      color: #888;
+    }
+    .bookmark-btn {
+      background: #1a1a2e;
+      color: #fff;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .bookmark-btn:active { background: #333; }
   </style>
 </head>
 <body>
@@ -22,35 +42,104 @@
     <span class="topbar-title" id="title">加载中...</span>
     <a id="downloadBtn" class="download-btn" style="display:none;">下载</a>
   </div>
+  <div class="bookmark-bar" id="bookmarkBar" style="display:none;">
+    <button class="bookmark-btn" id="bookmarkBtn">🔖 添加书签</button>
+    <span id="bookmarkInfo"></span>
+  </div>
   <div class="content" id="content">
     <div class="loading">加载中...</div>
   </div>
+
   <script>
     const USERNAME = 'HopeuLive';
     const REPO = 'charlies-cave';
+    let currentPath = '';
+
+    function getBookmarkKey() {
+      return 'bookmark_' + currentPath;
+    }
+
+    function saveBookmark() {
+      const scrollPos = window.scrollY;
+      const totalHeight = document.body.scrollHeight - window.innerHeight;
+      const percent = totalHeight > 0 ? Math.round((scrollPos / totalHeight) * 100) : 0;
+      const bookmark = {
+        percent: percent,
+        time: new Date().toLocaleString('zh-CN'),
+        preview: document.getElementById('content').textContent.substring(0, 50)
+      };
+      localStorage.setItem(getBookmarkKey(), JSON.stringify(bookmark));
+      updateBookmarkInfo();
+    }
+
+    function getBookmark() {
+      const data = localStorage.getItem(getBookmarkKey());
+      if (!data) return null;
+      try {
+        return JSON.parse(data);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function updateBookmarkInfo() {
+      const bookmark = getBookmark();
+      const info = document.getElementById('bookmarkInfo');
+      const btn = document.getElementById('bookmarkBtn');
+      if (bookmark) {
+        info.textContent = '上次看到 ' + bookmark.percent + '%（' + bookmark.time + '）';
+        btn.textContent = '🔖 更新书签';
+      } else {
+        info.textContent = '暂无书签';
+        btn.textContent = '🔖 添加书签';
+      }
+    }
+
+    function goToBookmark() {
+      const bookmark = getBookmark();
+      if (bookmark) {
+        const totalHeight = document.body.scrollHeight - window.innerHeight;
+        const targetY = (bookmark.percent / 100) * totalHeight;
+        window.scrollTo({ top: targetY, behavior: 'instant' });
+      }
+    }
+
     async function loadFile() {
       const params = new URLSearchParams(window.location.search);
       const filePath = params.get('path');
       if (!filePath) { document.getElementById('content').innerHTML = '<div class="error">缺少文件路径</div>'; return; }
+      currentPath = filePath;
+      
+      document.getElementById('bookmarkBar').style.display = 'flex';
+      updateBookmarkInfo();
+      
       try {
         const response = await fetch('https://api.github.com/repos/' + USERNAME + '/' + REPO + '/contents/' + filePath);
         if (!response.ok) throw new Error('Failed');
         const data = await response.json();
         const content = decodeURIComponent(escape(atob(data.content)));
         const fileName = data.name.replace(/\.txt$/i, '');
+        
         document.title = fileName;
         document.getElementById('title').textContent = fileName;
         document.getElementById('content').textContent = content;
+        
         const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const btn = document.getElementById('downloadBtn');
         btn.href = url;
         btn.download = fileName + '.txt';
         btn.style.display = 'inline-block';
+        
+        goToBookmark();
+        updateBookmarkInfo();
       } catch (error) {
         document.getElementById('content').innerHTML = '<div class="error">加载失败，请返回重试</div>';
       }
     }
+
+    document.getElementById('bookmarkBtn').addEventListener('click', saveBookmark);
+
     loadFile();
   </script>
 </body>
